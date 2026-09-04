@@ -2,6 +2,17 @@
 
 > A better `Promise.race()` for TypeScript: keyed results, precise narrowing, and optional cooperative cancellation.
 
+[![CI](https://github.com/lumberjacque/better-race/actions/workflows/ci.yml/badge.svg)](https://github.com/lumberjacque/better-race/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/better-race?logo=npm&label=npm&color=cb3837)](https://www.npmjs.com/package/better-race)
+[![npm downloads](https://img.shields.io/npm/dw/better-race?logo=npm&label=downloads)](https://www.npmjs.com/package/better-race)
+[![coverage: 100%](https://img.shields.io/badge/coverage-100%25-21c55d?logo=vitest&logoColor=white)](#quality-checks)
+[![TypeScript ≥5.4](https://img.shields.io/badge/TypeScript-%E2%89%A55.4-3178c6?logo=typescript&logoColor=white)](#public-types)
+[![Node ≥22](https://img.shields.io/badge/Node-%E2%89%A522-339933?logo=nodedotjs&logoColor=white)](#installation)
+[![minzipped size](https://img.shields.io/bundlephobia/minzip/better-race?label=minzipped)](https://bundlephobia.com/package/better-race)
+[![license: MIT](https://img.shields.io/github/license/lumberjacque/better-race)](LICENSE)
+
+`ESM-only` · `zero runtime dependencies` · `tree-shakeable` · `AbortSignal`-native
+
 `Promise.race()` tells you the first value that settled. `better-race` also tells you **which task produced it**, while keeping that key and value connected in TypeScript.
 
 ```ts
@@ -209,34 +220,6 @@ npm run test:pack     # Test the tarball from a clean consumer
 ```
 
 Husky runs formatting for staged files plus typechecking and tests before commits. Commit messages use the Conventional Commits specification.
-
-### Releases
-
-Releases are intentionally local and manual.
-
-For the initial `0.1.0` release, the version is already set. Commit and tag the initial package, then publish it:
-
-```sh
-git tag -a v0.1.0 -m "v0.1.0"
-npm run publish
-```
-
-For every later user-visible change, create and commit a Changeset first. Then generate and commit the version and changelog update before publishing:
-
-```sh
-npx changeset
-git add .changeset package.json CHANGELOG.md
-git commit -m "chore: prepare release"
-npm run version
-git add package.json CHANGELOG.md
-git commit -m "chore: release v0.1.1"
-git tag -a v0.1.1 -m "v0.1.1"
-npm run publish
-```
-
-`npm run publish` refuses a dirty Git working tree and runs the full verification suite before publishing. GitHub Actions never publishes this package. This means npm provenance is not produced; enable CI trusted publishing in a future release if provenance becomes a requirement.
-
-`raceUntil()` is planned for a later `0.x` prerelease on npm's `next` tag. It will not be added to `latest` until its acceptance and failure semantics are stable.
 
 ## Contributing and security
 

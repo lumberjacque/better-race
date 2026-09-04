@@ -10,14 +10,14 @@
     "race",
     "typescript"
   ],
-  "homepage": "https://github.com/REPLACE_ME/better-race#readme",
+  "homepage": "https://github.com/lumberjacque/better-race#readme",
   "bugs": {
-    "url": "https://github.com/REPLACE_ME/better-race/issues"
+    "url": "https://github.com/lumberjacque/better-race/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/REPLACE_ME/better-race.git"
+    "url": "git+https://github.com/lumberjacque/better-race.git"
   },
   "files": [
     "dist",
