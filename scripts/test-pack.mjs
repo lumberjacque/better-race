@@ -64,6 +64,7 @@ try {
     "abort-losers.js",
     "external-abort.js",
     "rejection-semantics.js",
+    "until-accepted-result.js",
   ]) {
     run(process.execPath, [join("out", basename(name))], consumer);
   }

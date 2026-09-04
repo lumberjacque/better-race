@@ -5,10 +5,10 @@
 [![CI](https://github.com/lumberjacque/better-race/actions/workflows/ci.yml/badge.svg)](https://github.com/lumberjacque/better-race/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/better-race?logo=npm&label=npm&color=cb3837)](https://www.npmjs.com/package/better-race)
 [![npm downloads](https://img.shields.io/npm/dw/better-race?logo=npm&label=downloads)](https://www.npmjs.com/package/better-race)
-[![coverage: 100%](https://img.shields.io/badge/coverage-100%25-21c55d?logo=vitest&logoColor=white)](#quality-checks)
+[![coverage: 100%](https://img.shields.io/badge/coverage-100%25-21c55d?logo=vitest&logoColor=white)](https://github.com/lumberjacque/better-race/actions/workflows/ci.yml)
 [![TypeScript ≥5.4](https://img.shields.io/badge/TypeScript-%E2%89%A55.4-3178c6?logo=typescript&logoColor=white)](#public-types)
 [![Node ≥22](https://img.shields.io/badge/Node-%E2%89%A522-339933?logo=nodedotjs&logoColor=white)](#installation)
-[![minzipped size](https://img.shields.io/bundlephobia/minzip/better-race?label=minzipped)](https://bundlephobia.com/package/better-race)
+[![tree-shaken bundle size](https://deno.bundlejs.com/badge?q=better-race&treeshake=%5B%2A%5D)](https://deno.bundlejs.com/?q=better-race&treeshake=%5B%2A%5D)
 [![license: MIT](https://img.shields.io/github/license/lumberjacque/better-race)](LICENSE)
 
 `ESM-only` · `zero runtime dependencies` · `tree-shakeable` · `AbortSignal`-native
@@ -160,6 +160,74 @@ import type { RaceContext, RaceOptions, RaceResult, RaceTask, RaceTasks } from "
 
 `RaceContext` deliberately contains only `signal`. There are no framework adapters, schedulers, retries, timeouts, hooks, or hidden global state.
 
+## `raceUntil(tasks, options)`
+
+`raceUntil()` starts every task concurrently, but settles only when a fulfilled value passes `accept`. It is for “first usable result” cases where an early `null`, stale response, or unsuitable value should not end the race.
+
+```ts
+import { raceUntil } from "better-race";
+
+type User = { id: string };
+
+const winner = await raceUntil(
+  {
+    memory: () => memoryCache.get("user-42"), // User | null
+    redis: () => redisCache.get("user-42"), // User | null
+    database: ({ signal }) => fetchUser("user-42", { signal }), // User
+  },
+  {
+    accept: (value): value is User => value !== null,
+    abortLosers: true,
+  },
+);
+
+winner.key; // "memory" | "redis" | "database"
+winner.value; // User
+```
+
+### Semantics
+
+- All tasks start in object property order before any fulfilment, rejection, or acceptance is processed.
+- A fulfilled value for which `accept(value)` is `false` is declined; pending tasks keep racing.
+- A task rejection is recorded and ignored while another task could still provide an accepted value.
+- The first accepted value wins. With `abortLosers: true`, every pending loser receives an abort signal; otherwise it keeps running.
+- If every task settles without an accepted value, `raceUntil()` rejects with `NoAcceptedResultError`.
+- If `accept` throws, `raceUntil()` rejects with that exact error. External abort behaves exactly like `race()` and aborts all pending tasks with the caller’s original `signal.reason`.
+
+`NoAcceptedResultError` extends `AggregateError`. Its `errors` array retains original rejection reasons, and its `rejections` property keeps each reason coupled to the task key:
+
+```ts
+try {
+  await raceUntil(tasks, { accept: isUsable });
+} catch (error) {
+  if (error instanceof NoAcceptedResultError) {
+    error.rejections; // readonly { key: string; reason: unknown }[]
+  }
+}
+```
+
+### Type narrowing
+
+Use an explicit type predicate when the result must be narrowed on TypeScript 5.4 and newer:
+
+```ts
+accept: (value): value is User => value !== null;
+```
+
+A plain boolean callback is always valid, but preserves each task’s original value type. The keyed relationship remains intact in both forms.
+
+### Public types
+
+```ts
+import {
+  NoAcceptedResultError,
+  raceUntil,
+  type RaceUntilOptions,
+  type RaceUntilRejection,
+  type RaceUntilResult,
+} from "better-race";
+```
+
 ## Use cases
 
 - Read from a memory cache, distributed cache, and primary store simultaneously.
@@ -167,6 +235,7 @@ import type { RaceContext, RaceOptions, RaceResult, RaceTask, RaceTasks } from "
 - Race a preferred endpoint against a fallback endpoint, then abort the fallback.
 - Preserve source information for metrics, tracing, or structured logging.
 - Write compact TypeScript that narrows the result without hand-written wrapper objects.
+- Query several stores in parallel until one returns a usable, non-null record.
 
 ## Examples
 
@@ -176,6 +245,7 @@ The executable examples are in [`examples/`](./examples):
 - [`abort-losers.ts`](./examples/abort-losers.ts)
 - [`external-abort.ts`](./examples/external-abort.ts)
 - [`rejection-semantics.ts`](./examples/rejection-semantics.ts)
+- [`until-accepted-result.ts`](./examples/until-accepted-result.ts)
 
 CI compiles and executes these examples against the packed package, not the source tree.
 
@@ -197,7 +267,26 @@ replica    │ ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ × abor
 Legend: █ active fulfilled work · ▓ active rejected work · ▒ active work aborted by the race
 ```
 
-Open [`playground/race-lab.html`](./playground/race-lab.html) directly in a browser to explore an animated version. It contains four concrete scenarios: fulfilment, first rejection, continuing losers, and external abort. The page is a visual prototype, not a shipped package artifact; Vitest and the packed-consumer test verify the runtime contract.
+`raceUntil()` keeps the same concurrent start, but the line marks the first **accepted** value rather than the first settlement:
+
+```text
+RaceUntil Timeline — wait for an accepted result
+
+Task       │ Outcome          │ Decision                    │ Timeline
+───────────┼──────────────────┼─────────────────────────────┼────────────────────────────────────
+memory     │ null @ 24ms      │ accept → false · decline    │ ███ ▧ declined
+redis      │ Error @ 68ms     │ record rejection · continue │ ████████ ▓ recorded
+database   │ User @ 176ms     │ accept → true · winner      │ ██████████████████████ ● accepted
+backup     │ pending @ 176ms  │ abortLosers → abort          │ ██████████████████████ ▒ cancelled
+
+Legend: █ active task work · ▧ fulfilled candidate declined by accept · ▓ recorded rejection · ● accepted winner · ▒ cancelled loser
+```
+
+Open [`playground/race-lab.html`](./playground/race-lab.html) directly in a browser to explore an animated version. It contains concrete `race()` and `raceUntil()` scenarios; the page is a visual prototype, not a shipped package artifact. Vitest and the packed-consumer test verify the runtime contract.
+
+## Quality checks
+
+The [CI workflow](https://github.com/lumberjacque/better-race/actions/workflows/ci.yml) runs the V8 coverage report on Node 22, 24, and 26. The configured threshold is exactly 100% for statements, branches, functions, and lines, so a green CI run is a verifiable guarantee rather than a decorative badge. Open the latest `Node 22` job to inspect its full report.
 
 ## Development
 
