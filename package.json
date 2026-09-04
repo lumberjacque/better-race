@@ -1,6 +1,6 @@
 {
   "name": "better-race",
-  "version": "0.2.0-next.0",
+  "version": "0.2.0",
   "description": "A better Promise.race() for TypeScript: keyed results and optional cancellation.",
   "keywords": [
     "abortsignal",
