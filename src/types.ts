@@ -28,6 +28,11 @@ export interface RaceOptions {
    */
   readonly abortLosers?: boolean;
 }
+/** Options that control which fulfilled values may win a {@link raceUntil}. */
+export interface RaceUntilOptions<TValue = unknown> extends RaceOptions {
+  /** Returns `true` when this fulfilled value should win the race. */
+  readonly accept: (value: TValue) => boolean;
+}
 
 type StringKeyOf<T> = Extract<keyof T, string>;
 
@@ -44,3 +49,16 @@ export type RaceResult<T extends RaceTasks> = {
 
 /** @internal Rejects an empty object at compile time. */
 export type NonEmptyTasks<T extends RaceTasks> = keyof T extends never ? never : T;
+/** The union of all values that tasks in a race can fulfil with. */
+export type RaceValue<T extends RaceTasks> = Awaited<ReturnType<T[StringKeyOf<T>]>>;
+
+/**
+ * The keyed result returned by {@link raceUntil} when `accept` is a type
+ * predicate. Each task value is narrowed independently while keeping its key.
+ */
+export type RaceUntilResult<T extends RaceTasks, Accepted> = {
+  [K in StringKeyOf<T>]: {
+    readonly key: K;
+    readonly value: Extract<Awaited<ReturnType<T[K]>>, Accepted>;
+  };
+}[StringKeyOf<T>];

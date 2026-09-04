@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Race Timeline — better-race</title>
+    <title>Race Lab — better-race</title>
     <style>
       :root {
         --ink: #05070a;
@@ -274,6 +274,10 @@
         background: linear-gradient(90deg, #318cbd, var(--cyan));
         color: #062333;
       }
+      .bar.declined {
+        background: repeating-linear-gradient(135deg, #a87932 0 6px, #f6c76a 6px 11px);
+        color: #2c210d;
+      }
       .bar.active {
         animation: run var(--run-time) cubic-bezier(0.16, 0.8, 0.22, 1) forwards;
         opacity: 1;
@@ -472,27 +476,26 @@
       <header>
         <div>
           <div class="eyebrow">Interactive semantics prototype</div>
-          <h1>Race Timeline</h1>
+          <h1>Race Lab</h1>
           <p class="lede">
-            A visual answer to one question: when concurrent work settles, can you see exactly who
-            won, what kept running, and what cancellation changed?
+            See concurrent work, settlement, acceptance, and cancellation on one timeline.
           </p>
         </div>
-        <div class="chip">better-race · v0.1.0</div>
+        <div class="chip">better-race · semantics lab</div>
       </header>
 
       <div class="question">
         <strong>Not a dependency waterfall.</strong> Every lane starts at <code>0ms</code>, because
-        <code>race()</code> starts all tasks. This timeline visualises settlement and
-        cancellation—not scheduling or task dependencies.
+        <code>race()</code> and <code>raceUntil()</code> start all tasks. This timeline visualises
+        settlement, acceptance, and cancellation—not scheduling or task dependencies.
       </div>
 
-      <section class="shell" aria-label="Race Timeline simulator">
+      <section class="shell" aria-label="Race Lab simulator">
         <div class="toolbar">
           <div class="scenario-tabs" id="scenario-tabs"></div>
           <div class="actions">
             <button id="reset">Reset</button>
-            <button class="primary" id="play">▶ Play race</button>
+            <button class="primary" id="play">▶ Play timeline</button>
           </div>
         </div>
         <div class="content">
@@ -502,7 +505,8 @@
               <p id="scenario-description"></p>
             </div>
             <div class="contract">
-              <strong id="settle-label"></strong><span>first settlement wins</span>
+              <strong id="settle-label"></strong
+              ><span id="contract-copy">first settlement wins</span>
             </div>
           </div>
           <div class="timeline" id="timeline">
@@ -523,11 +527,12 @@
           <div class="footer">
             <div class="legend">
               <span class="ok"><b>█</b> fulfilled winner</span
-              ><span class="bad"><b>▓</b> rejected winner</span
+              ><span class="decline"><b>▧</b> candidate declined</span
+              ><span class="bad"><b>▓</b> rejected task</span
               ><span class="cancel"><b>▒</b> cancelled loser</span
               ><span class="continue"><b>░</b> continuing loser</span>
             </div>
-            <span>Click a scenario, then play it.</span>
+            <span>Switch scenarios to replay the timeline.</span>
           </div>
         </div>
       </section>
@@ -636,6 +641,50 @@
           ],
         },
         {
+          id: "until",
+          title: "raceUntil · wait for a usable user",
+          description:
+            "A fast null and a rejected replica are evidence, not winners. Database fulfils with a User at 176ms; accept() approves it and aborts the still-pending backup.",
+          winner: "database",
+          at: 176,
+          kind: "accepted",
+          contract: "first accepted value wins",
+          settlement: "database accepted",
+          cancelLosers: true,
+          stream:
+            '00ms  all tasks invoked in object property order\n 24ms  memory fulfils <span class="highlight">null</span> — accept returns false\n 68ms  redis rejects — error recorded; race continues\n176ms  <span class="highlight">database fulfils User — accept returns true, race settles</span>\n176ms  abort signals fan out to the pending backup',
+          lanes: [
+            {
+              key: "memory",
+              detail: "L1 cache · null",
+              duration: 24,
+              status: "declined",
+              text: "24ms × declined",
+            },
+            {
+              key: "redis",
+              detail: "replica · error",
+              duration: 68,
+              status: "rejected",
+              text: "68ms × recorded",
+            },
+            {
+              key: "database",
+              detail: "primary store · User",
+              duration: 176,
+              status: "fulfilled",
+              text: "176ms ✓ accepted",
+            },
+            {
+              key: "backup",
+              detail: "fallback endpoint",
+              duration: 176,
+              status: "aborted",
+              text: "aborted",
+            },
+          ],
+        },
+        {
           id: "abort",
           title: "Caller aborts the pending race",
           description:
@@ -687,6 +736,7 @@
         const cleanup = s.cancelLosers
           ? "abort signals fan out to pending losers"
           : "remaining tasks continue independently";
+        if (s.stream) return s.stream;
         return `00ms  all tasks invoked in object property order\n${String(s.at).padStart(3, " ")}ms  <span class="highlight">${s.winner} ${winner} first — race settles</span>\n${String(s.at).padStart(3, " ")}ms  ${cleanup}`;
       }
       function render() {
@@ -700,8 +750,10 @@
         document.querySelector("#scenario-title").textContent = s.title;
         document.querySelector("#scenario-description").textContent = s.description;
         document.querySelector("#settle-label").textContent = `${s.at}ms`;
+        document.querySelector("#contract-copy").textContent =
+          s.contract ?? "first settlement wins";
         document.querySelector("#settlement-text").textContent =
-          s.kind === "aborted" ? "external abort" : `${s.winner} settles`;
+          s.settlement ?? (s.kind === "aborted" ? "external abort" : `${s.winner} settles`);
         timeline.style.setProperty("--winner-at", `${(s.at / MAX_MS) * 100}%`);
         timeline.style.setProperty("--settle-time", `${Math.max(0.5, (s.at / MAX_MS) * 2.3)}s`);
         lanesRoot.innerHTML = s.lanes
@@ -714,7 +766,7 @@
         timeline.classList.toggle("playing", state.playing);
         timeline.classList.toggle("cancel-losers", state.playing && s.cancelLosers);
         stream.innerHTML = statusMessage(s);
-        play.textContent = state.playing ? "↻ Replay race" : "▶ Play race";
+        play.textContent = state.playing ? "↻ Replay timeline" : "▶ Play timeline";
       }
       function playScenario() {
         state.playing = false;
