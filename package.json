@@ -1,0 +1,72 @@
+{
+  "name": "better-race",
+  "version": "0.1.0",
+  "description": "A better Promise.race() for TypeScript: keyed results and optional cancellation.",
+  "keywords": [
+    "abortsignal",
+    "async",
+    "cancellation",
+    "promise",
+    "race",
+    "typescript"
+  ],
+  "homepage": "https://github.com/REPLACE_ME/better-race#readme",
+  "bugs": {
+    "url": "https://github.com/REPLACE_ME/better-race/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/REPLACE_ME/better-race.git"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint .",
+    "lint:ci": "oxlint --deny-warnings .",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:types": "vitest --typecheck",
+    "test:pack": "node scripts/test-pack.mjs",
+    "verify": "node scripts/verify.mjs",
+    "version": "changeset version",
+    "publish": "node scripts/publish.mjs",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.2",
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "@types/node": "^26.4.1",
+    "@vitest/coverage-v8": "^5.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.4.1",
+    "oxfmt": "^0.66.0",
+    "oxlint": "^1.81.0",
+    "tsdown": "^0.23.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.0"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,ts,tsx,json,jsonc,md,yml,yaml,html,css}": "oxfmt --write"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

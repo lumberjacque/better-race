@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Race Timeline — better-race</title>
+    <style>
+      :root {
+        --ink: #05070a;
+        --canvas: #05070a;
+        --panel: #0a0e14;
+        --panel-2: #10161e;
+        --line: #1e2933;
+        --muted: #8b98a8;
+        --text: #eff4f8;
+        --mint: #94f0c7;
+        --cyan: #78cfff;
+        --red: #ff8194;
+        --amber: #f6c76a;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-width: 320px;
+        background: var(--canvas);
+        color: var(--text);
+        font:
+          15px/1.5 Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 42px auto 72px;
+      }
+      .eyebrow {
+        color: var(--mint);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 24px;
+        margin-bottom: 30px;
+      }
+      h1 {
+        margin: 8px 0 8px;
+        font-size: clamp(2.5rem, 7vw, 5.6rem);
+        letter-spacing: -0.075em;
+        line-height: 0.88;
+      }
+      .lede {
+        color: var(--muted);
+        font-size: 1.05rem;
+        margin: 0;
+        max-width: 650px;
+      }
+      .chip {
+        border: 1px solid #31506b;
+        border-radius: 999px;
+        color: var(--cyan);
+        font:
+          700 11px ui-monospace,
+          monospace;
+        letter-spacing: 0.08em;
+        padding: 7px 10px;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .question {
+        background: #0b1118;
+        border: 1px solid #202d3a;
+        border-radius: 16px;
+        color: #b8c9d9;
+        margin: 28px 0;
+        padding: 16px 18px;
+      }
+      .question strong {
+        color: var(--text);
+      }
+      .shell {
+        background: rgba(14, 26, 41, 0.88);
+        border: 1px solid #202b36;
+        border-radius: 20px;
+        box-shadow: 0 26px 65px rgba(0, 0, 0, 0.28);
+        overflow: hidden;
+      }
+      .toolbar {
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
+        padding: 15px 18px;
+      }
+      .scenario-tabs,
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      button {
+        background: #111923;
+        border: 1px solid #273440;
+        border-radius: 8px;
+        color: #c5d4e2;
+        cursor: pointer;
+        font: inherit;
+        padding: 8px 11px;
+        transition:
+          border-color 0.18s ease,
+          color 0.18s ease,
+          background 0.18s ease,
+          transform 0.18s ease;
+      }
+      button:hover {
+        border-color: var(--cyan);
+        color: var(--text);
+        transform: translateY(-1px);
+      }
+      button[aria-pressed="true"] {
+        background: #102535;
+        border-color: var(--cyan);
+        color: #eaf8ff;
+      }
+      button.primary {
+        background: var(--mint);
+        border-color: var(--mint);
+        color: #062018;
+        font-weight: 800;
+      }
+      button.primary:hover {
+        background: #a0f0d1;
+      }
+      .content {
+        padding: 22px 18px 18px;
+      }
+      .overview {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: 1fr auto;
+        margin-bottom: 20px;
+      }
+      .title-block h2 {
+        font-size: 1.1rem;
+        margin: 0 0 4px;
+      }
+      .title-block p {
+        color: var(--muted);
+        margin: 0;
+      }
+      .contract {
+        align-items: center;
+        border-left: 1px solid var(--line);
+        color: var(--muted);
+        display: flex;
+        font:
+          12px ui-monospace,
+          monospace;
+        padding-left: 16px;
+      }
+      .contract strong {
+        color: var(--mint);
+        font-size: 1.1rem;
+        margin-right: 8px;
+      }
+      .timeline {
+        position: relative;
+      }
+      .axis {
+        color: #688098;
+        display: grid;
+        font:
+          11px ui-monospace,
+          monospace;
+        grid-template-columns: 156px 1fr;
+        margin-bottom: 8px;
+      }
+      .ticks {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 3px;
+      }
+      .lanes {
+        display: grid;
+        gap: 10px;
+      }
+      .lane {
+        align-items: center;
+        display: grid;
+        grid-template-columns: 156px 1fr;
+        min-height: 54px;
+      }
+      .lane-label {
+        padding-right: 16px;
+      }
+      .lane-label strong {
+        display: block;
+        font:
+          700 14px ui-monospace,
+          monospace;
+      }
+      .lane-label span {
+        color: var(--muted);
+        display: block;
+        font-size: 12px;
+      }
+      .track {
+        background: repeating-linear-gradient(
+          90deg,
+          transparent 0,
+          transparent calc(25% - 1px),
+          rgba(106, 131, 153, 0.23) calc(25% - 1px),
+          rgba(106, 131, 153, 0.23) 25%
+        );
+        border-bottom: 1px solid #213448;
+        border-top: 1px solid #213448;
+        height: 30px;
+        overflow: visible;
+        position: relative;
+      }
+      .bar {
+        align-items: center;
+        border-radius: 4px;
+        color: #062018;
+        display: flex;
+        font:
+          800 10px ui-monospace,
+          monospace;
+        height: 100%;
+        justify-content: end;
+        min-width: 4px;
+        opacity: 0.23;
+        padding-right: 7px;
+        position: absolute;
+        transform-origin: left center;
+        transition: opacity 0.24s ease;
+        width: var(--duration);
+      }
+      .bar::after {
+        background: currentColor;
+        border-radius: 50%;
+        content: "";
+        height: 6px;
+        position: absolute;
+        right: -3px;
+        top: 12px;
+        width: 6px;
+      }
+      .bar.fulfilled {
+        background: linear-gradient(90deg, #54be93, var(--mint));
+      }
+      .bar.rejected {
+        background: linear-gradient(90deg, #cb526a, var(--red));
+        color: #320a12;
+      }
+      .bar.aborted {
+        background: repeating-linear-gradient(135deg, #d7a755 0 6px, #f6c76a 6px 11px);
+        color: #392709;
+      }
+      .bar.continuing {
+        background: linear-gradient(90deg, #318cbd, var(--cyan));
+        color: #062333;
+      }
+      .bar.active {
+        animation: run var(--run-time) cubic-bezier(0.16, 0.8, 0.22, 1) forwards;
+        opacity: 1;
+        transform: scaleX(0);
+      }
+      .bar.active::after {
+        animation: endpoint var(--run-time) linear forwards;
+        opacity: 0;
+      }
+      @keyframes run {
+        to {
+          transform: scaleX(1);
+        }
+      }
+      @keyframes endpoint {
+        92%,
+        100% {
+          opacity: 1;
+        }
+      }
+      .settlement-line {
+        border-left: 1px dashed var(--mint);
+        bottom: -6px;
+        display: none;
+        left: var(--winner-at);
+        position: absolute;
+        top: 20px;
+        z-index: 3;
+      }
+      .settlement-line::before {
+        background: var(--mint);
+        border-radius: 50%;
+        box-shadow:
+          0 0 0 5px rgba(124, 229, 189, 0.13),
+          0 0 22px var(--mint);
+        content: "";
+        height: 9px;
+        left: -5px;
+        position: absolute;
+        top: -5px;
+        width: 9px;
+      }
+      .settlement-line span {
+        background: #102620;
+        border: 1px solid #3d9d82;
+        border-radius: 5px;
+        color: var(--mint);
+        font:
+          700 10px ui-monospace,
+          monospace;
+        left: 8px;
+        padding: 3px 5px;
+        position: absolute;
+        top: -15px;
+        white-space: nowrap;
+      }
+      .playing .settlement-line {
+        animation: reveal 0.15s linear calc(var(--settle-time) - 0.12s) forwards;
+        display: block;
+        opacity: 0;
+      }
+      @keyframes reveal {
+        to {
+          opacity: 1;
+        }
+      }
+      .flow {
+        border-top: 2px dotted var(--mint);
+        display: none;
+        height: 30px;
+        left: var(--winner-at);
+        opacity: 0.8;
+        position: absolute;
+        top: calc(50% - 1px);
+        width: calc(100% - var(--winner-at));
+        z-index: 2;
+      }
+      .flow::after {
+        color: var(--mint);
+        content: "→ abort signals";
+        font:
+          10px ui-monospace,
+          monospace;
+        left: 7px;
+        position: absolute;
+        top: -20px;
+        white-space: nowrap;
+      }
+      .playing.cancel-losers .flow {
+        animation: flow 1.3s linear calc(var(--settle-time) - 0.03s) forwards;
+        display: block;
+        opacity: 0;
+      }
+      @keyframes flow {
+        0% {
+          background-position: 0 0;
+          opacity: 0;
+        }
+        15%,
+        100% {
+          opacity: 0.9;
+        }
+        100% {
+          background-position: 26px 0;
+        }
+      }
+      .footer {
+        align-items: center;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        display: flex;
+        flex-wrap: wrap;
+        font-size: 12px;
+        gap: 16px;
+        margin-top: 22px;
+        padding-top: 15px;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .legend b {
+        font:
+          16px ui-monospace,
+          monospace;
+        margin-right: 4px;
+      }
+      .legend .ok {
+        color: var(--mint);
+      }
+      .legend .bad {
+        color: var(--red);
+      }
+      .legend .cancel {
+        color: var(--amber);
+      }
+      .legend .continue {
+        color: var(--cyan);
+      }
+      .stream {
+        background: #070b10;
+        border: 1px solid #20364a;
+        border-radius: 9px;
+        color: #92acc5;
+        font:
+          12px/1.7 ui-monospace,
+          monospace;
+        margin-top: 19px;
+        min-height: 80px;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+      .stream .highlight {
+        color: var(--mint);
+      }
+      .stream .error {
+        color: var(--red);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+      @media (max-width: 680px) {
+        main {
+          margin-top: 24px;
+        }
+        header {
+          align-items: start;
+          flex-direction: column;
+        }
+        .overview {
+          grid-template-columns: 1fr;
+        }
+        .contract {
+          border-left: 0;
+          border-top: 1px solid var(--line);
+          padding: 10px 0 0;
+        }
+        .axis,
+        .lane {
+          grid-template-columns: 94px 1fr;
+        }
+        .lane-label span {
+          font-size: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <div class="eyebrow">Interactive semantics prototype</div>
+          <h1>Race Timeline</h1>
+          <p class="lede">
+            A visual answer to one question: when concurrent work settles, can you see exactly who
+            won, what kept running, and what cancellation changed?
+          </p>
+        </div>
+        <div class="chip">better-race · v0.1.0</div>
+      </header>
+
+      <div class="question">
+        <strong>Not a dependency waterfall.</strong> Every lane starts at <code>0ms</code>, because
+        <code>race()</code> starts all tasks. This timeline visualises settlement and
+        cancellation—not scheduling or task dependencies.
+      </div>
+
+      <section class="shell" aria-label="Race Timeline simulator">
+        <div class="toolbar">
+          <div class="scenario-tabs" id="scenario-tabs"></div>
+          <div class="actions">
+            <button id="reset">Reset</button>
+            <button class="primary" id="play">▶ Play race</button>
+          </div>
+        </div>
+        <div class="content">
+          <div class="overview">
+            <div class="title-block">
+              <h2 id="scenario-title"></h2>
+              <p id="scenario-description"></p>
+            </div>
+            <div class="contract">
+              <strong id="settle-label"></strong><span>first settlement wins</span>
+            </div>
+          </div>
+          <div class="timeline" id="timeline">
+            <div class="axis">
+              <span>task</span>
+              <div class="ticks">
+                <span>0ms</span><span>100ms</span><span>200ms</span><span>300ms</span
+                ><span>400ms</span>
+              </div>
+            </div>
+            <div class="settlement-line" id="settlement-line">
+              <span id="settlement-text"></span>
+            </div>
+            <div class="flow" id="flow"></div>
+            <div class="lanes" id="lanes"></div>
+          </div>
+          <div class="stream" id="stream" aria-live="polite"></div>
+          <div class="footer">
+            <div class="legend">
+              <span class="ok"><b>█</b> fulfilled winner</span
+              ><span class="bad"><b>▓</b> rejected winner</span
+              ><span class="cancel"><b>▒</b> cancelled loser</span
+              ><span class="continue"><b>░</b> continuing loser</span>
+            </div>
+            <span>Click a scenario, then play it.</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      // Portable pure model: the DOM only renders these concrete race scenarios.
+      const scenarios = [
+        {
+          id: "cache",
+          title: "Cache wins · cancel the network",
+          description:
+            "All three tasks start together. Cache fulfils at 72ms, then cooperative API and replica work receive abort signals.",
+          winner: "cache",
+          at: 72,
+          kind: "fulfilled",
+          cancelLosers: true,
+          lanes: [
+            {
+              key: "cache",
+              detail: "memory cache",
+              duration: 72,
+              status: "fulfilled",
+              text: "72ms ✓",
+            },
+            {
+              key: "api",
+              detail: "primary endpoint",
+              duration: 72,
+              status: "aborted",
+              text: "aborted",
+            },
+            {
+              key: "replica",
+              detail: "replica endpoint",
+              duration: 72,
+              status: "aborted",
+              text: "aborted",
+            },
+          ],
+        },
+        {
+          id: "reject",
+          title: "Replica rejects first",
+          description:
+            "Rejection is a settlement. The race rejects with the original error and stops cooperative losers when abortLosers is enabled.",
+          winner: "replica",
+          at: 118,
+          kind: "rejected",
+          cancelLosers: true,
+          lanes: [
+            {
+              key: "cache",
+              detail: "memory cache",
+              duration: 118,
+              status: "aborted",
+              text: "aborted",
+            },
+            {
+              key: "api",
+              detail: "primary endpoint",
+              duration: 118,
+              status: "aborted",
+              text: "aborted",
+            },
+            {
+              key: "replica",
+              detail: "replica endpoint",
+              duration: 118,
+              status: "rejected",
+              text: "118ms ✕",
+            },
+          ],
+        },
+        {
+          id: "continue",
+          title: "API wins · losers continue",
+          description:
+            "With abortLosers disabled, the winner is returned at 146ms and the other task is deliberately left to finish independently.",
+          winner: "api",
+          at: 146,
+          kind: "fulfilled",
+          cancelLosers: false,
+          lanes: [
+            {
+              key: "cache",
+              detail: "disk cache",
+              duration: 260,
+              status: "continuing",
+              text: "260ms",
+            },
+            {
+              key: "api",
+              detail: "primary endpoint",
+              duration: 146,
+              status: "fulfilled",
+              text: "146ms ✓",
+            },
+            {
+              key: "replica",
+              detail: "replica endpoint",
+              duration: 310,
+              status: "continuing",
+              text: "310ms",
+            },
+          ],
+        },
+        {
+          id: "abort",
+          title: "Caller aborts the pending race",
+          description:
+            "The external signal settles the race at 94ms. Every task receives an abort signal and the promise rejects with signal.reason.",
+          winner: "external signal",
+          at: 94,
+          kind: "aborted",
+          cancelLosers: true,
+          lanes: [
+            {
+              key: "cache",
+              detail: "memory cache",
+              duration: 94,
+              status: "aborted",
+              text: "aborted",
+            },
+            {
+              key: "api",
+              detail: "primary endpoint",
+              duration: 94,
+              status: "aborted",
+              text: "aborted",
+            },
+            {
+              key: "replica",
+              detail: "replica endpoint",
+              duration: 94,
+              status: "aborted",
+              text: "aborted",
+            },
+          ],
+        },
+      ];
+
+      const MAX_MS = 400;
+      const state = { active: 0, playing: false };
+      const tabRoot = document.querySelector("#scenario-tabs");
+      const lanesRoot = document.querySelector("#lanes");
+      const timeline = document.querySelector("#timeline");
+      const stream = document.querySelector("#stream");
+      const play = document.querySelector("#play");
+
+      function model() {
+        return scenarios[state.active];
+      }
+      function statusMessage(s) {
+        const winner =
+          s.kind === "rejected" ? "rejects" : s.kind === "aborted" ? "aborts" : "fulfils";
+        const cleanup = s.cancelLosers
+          ? "abort signals fan out to pending losers"
+          : "remaining tasks continue independently";
+        return `00ms  all tasks invoked in object property order\n${String(s.at).padStart(3, " ")}ms  <span class="highlight">${s.winner} ${winner} first — race settles</span>\n${String(s.at).padStart(3, " ")}ms  ${cleanup}`;
+      }
+      function render() {
+        const s = model();
+        tabRoot.innerHTML = scenarios
+          .map(
+            (item, index) =>
+              `<button aria-pressed="${index === state.active}" data-scenario="${index}">${item.title}</button>`,
+          )
+          .join("");
+        document.querySelector("#scenario-title").textContent = s.title;
+        document.querySelector("#scenario-description").textContent = s.description;
+        document.querySelector("#settle-label").textContent = `${s.at}ms`;
+        document.querySelector("#settlement-text").textContent =
+          s.kind === "aborted" ? "external abort" : `${s.winner} settles`;
+        timeline.style.setProperty("--winner-at", `${(s.at / MAX_MS) * 100}%`);
+        timeline.style.setProperty("--settle-time", `${Math.max(0.5, (s.at / MAX_MS) * 2.3)}s`);
+        lanesRoot.innerHTML = s.lanes
+          .map((lane) => {
+            const duration = Math.max(3, (lane.duration / MAX_MS) * 100);
+            const run = Math.max(0.4, (lane.duration / MAX_MS) * 2.3);
+            return `<div class="lane"><div class="lane-label"><strong>${lane.key}</strong><span>${lane.detail}</span></div><div class="track"><div class="bar ${lane.status}${state.playing ? " active" : ""}" style="--duration:${duration}%;--run-time:${run}s"><span>${lane.text}</span></div></div></div>`;
+          })
+          .join("");
+        timeline.classList.toggle("playing", state.playing);
+        timeline.classList.toggle("cancel-losers", state.playing && s.cancelLosers);
+        stream.innerHTML = statusMessage(s);
+        play.textContent = state.playing ? "↻ Replay race" : "▶ Play race";
+      }
+      function playScenario() {
+        state.playing = false;
+        render();
+        requestAnimationFrame(() => {
+          state.playing = true;
+          render();
+        });
+      }
+      tabRoot.addEventListener("click", (event) => {
+        const button = event.target.closest("button");
+        if (!button) return;
+        state.active = Number(button.dataset.scenario);
+        playScenario();
+      });
+      document.querySelector("#play").addEventListener("click", playScenario);
+      document.querySelector("#reset").addEventListener("click", () => {
+        state.playing = false;
+        render();
+      });
+      render();
+      requestAnimationFrame(playScenario);
+    </script>
+  </body>
+</html>
