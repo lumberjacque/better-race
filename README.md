@@ -18,13 +18,16 @@
 ```ts
 import { race } from "better-race";
 
-const winner = await race({
-  cache: () => readCache(),
-  api: ({ signal }) => fetchUser({ signal }),
-});
+const winner = await race(
+  {
+    eu: ({ signal }) => fetch("https://eu.example.com/user/42", { signal }),
+    us: ({ signal }) => fetch("https://us.example.com/user/42", { signal }),
+  },
+  { abortLosers: true },
+);
 
-if (winner.key === "api") {
-  winner.value; // exactly the return type of fetchUser
+if (winner.key === "eu") {
+  winner.value; // the Response from the EU replica
 }
 ```
 
@@ -33,8 +36,8 @@ if (winner.key === "api") {
 Native `Promise.race()` returns a value union but drops its source:
 
 ```ts
-const value = await Promise.race([readCache(), fetchUser()]);
-// CachedUser | ApiUser
+const value = await Promise.race([readEuReplica(), readUsReplica()]);
+// EuUser | UsUser
 ```
 
 You can restore the source by manually wrapping every promise. `better-race` makes that wrapper the default, preserves the relation as a discriminated union, and can abort cooperative losers when that saves work.
@@ -54,30 +57,33 @@ Pass an object whose string keys name tasks. A task can return a value, a promis
 ```ts
 import { race } from "better-race";
 
-const winner = await race({
-  memory: () => memoryCache.get("user-42"),
-  replica: ({ signal }) => replicaClient.get("user-42", { signal }),
-  primary: ({ signal }) => primaryClient.get("user-42", { signal }),
-});
+const winner = await race(
+  {
+    eu: ({ signal }) => euReplica.get("user-42", { signal }),
+    us: ({ signal }) => usReplica.get("user-42", { signal }),
+    apac: ({ signal }) => apacReplica.get("user-42", { signal }),
+  },
+  { abortLosers: true },
+);
 ```
 
 The result is inferred as:
 
 ```ts
-{ key: "memory"; value: MemoryUser }
-| { key: "replica"; value: ReplicaUser }
-| { key: "primary"; value: PrimaryUser }
+{ key: "eu"; value: EuUser }
+| { key: "us"; value: UsUser }
+| { key: "apac"; value: ApacUser }
 ```
 
 Narrow the key and TypeScript narrows the value:
 
 ```ts
-if (winner.key === "memory") {
-  winner.value; // MemoryUser
-} else if (winner.key === "replica") {
-  winner.value; // ReplicaUser
+if (winner.key === "eu") {
+  winner.value; // EuUser
+} else if (winner.key === "us") {
+  winner.value; // UsUser
 } else {
-  winner.value; // PrimaryUser
+  winner.value; // ApacUser
 }
 ```
 
@@ -100,8 +106,8 @@ By default, losers keep running, exactly like `Promise.race()`:
 
 ```ts
 const winner = await race({
-  cache: readCache,
-  network: ({ signal }) => fetch("/user", { signal }),
+  eu: ({ signal }) => fetch("https://eu.example.com/user/42", { signal }),
+  us: ({ signal }) => fetch("https://us.example.com/user/42", { signal }),
 });
 ```
 
@@ -162,7 +168,7 @@ import type { RaceContext, RaceOptions, RaceResult, RaceTask, RaceTasks } from "
 
 ## `raceUntil(tasks, options)`
 
-`raceUntil()` starts every task concurrently, but settles only when a fulfilled value passes `accept`. It is for “first usable result” cases where an early `null`, stale response, or unsuitable value should not end the race.
+`raceUntil()` starts every task concurrently, but settles only when a fulfilled value passes `accept`. It is for “first usable result” cases where an early `null`, stale response, or unsuitable value should not end the race. It is not a replacement for a normal cache-first lookup: use it only when starting every candidate is an intentional latency or resilience trade-off.
 
 ```ts
 import { raceUntil } from "better-race";
@@ -230,7 +236,7 @@ import {
 
 ## Use cases
 
-- Read from a memory cache, distributed cache, and primary store simultaneously.
+- Query independent read replicas when lower tail latency is worth redundant read work.
 - Query independent replicas and return the fastest response.
 - Race a preferred endpoint against a fallback endpoint, then abort the fallback.
 - Preserve source information for metrics, tracing, or structured logging.
@@ -254,13 +260,13 @@ CI compiles and executes these examples against the packed package, not the sour
 A race is not a dependency graph: every task starts immediately. The important moment is the first settlement.
 
 ```text
-Race Timeline — cache wins with abortLosers: true
+Race Timeline — EU replica wins with abortLosers: true
 
 Task       │ 0ms                 72ms                                  400ms
 ───────────┼─────────────────────┼──────────────────────────────────────────
-cache      │ ███████████████████ ● fulfilled winner
-api        │ ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ × abort signal received
-replica    │ ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ × abort signal received
+eu         │ ███████████████████ ● fulfilled winner
+us         │ ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ × abort signal received
+apac       │ ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ × abort signal received
                               ↑
                        first settlement wins
 

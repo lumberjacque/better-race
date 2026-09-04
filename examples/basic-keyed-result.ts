@@ -1,12 +1,11 @@
 import { race } from "better-race";
 
-const winner = await race({
-  cache: () => ({ kind: "cached" as const, ageMs: 20 }),
-  api: async () => ({ kind: "remote" as const, id: "user-42" }),
-});
+const winner = await race(
+  {
+    eu: async () => ({ region: "eu" as const, id: "user-42" }),
+    us: async () => ({ region: "us" as const, id: "user-42" }),
+  },
+  { abortLosers: true },
+);
 
-if (winner.key === "cache") {
-  console.log(`Using a ${winner.value.kind} value (${winner.value.ageMs}ms old).`);
-} else {
-  console.log(`Fetched ${winner.value.id} from the API.`);
-}
+console.log(`The ${winner.key.toUpperCase()} replica responded for ${winner.value.id}.`);
