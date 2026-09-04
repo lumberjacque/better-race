@@ -170,6 +170,31 @@ import type { RaceContext, RaceOptions, RaceResult, RaceTask, RaceTasks } from "
 
 `raceUntil()` starts every task concurrently, but settles only when a fulfilled value passes `accept`. It is for “first usable result” cases where an early `null`, stale response, or unsuitable value should not end the race. It is not a replacement for a normal cache-first lookup: use it only when starting every candidate is an intentional latency or resilience trade-off.
 
+### Keyed, cancellable `Promise.any()`
+
+Use an always-accepting predicate when the first fulfilled result should win. In
+that mode, `raceUntil()` is a keyed, cancellable alternative to `Promise.any()`:
+rejections are skipped while another task can still fulfil, and the winner keeps
+its task key.
+
+```ts
+const winner = await raceUntil(
+  {
+    cache: () => readCache(),
+    api: ({ signal }) => fetchUser({ signal }),
+  },
+  { accept: () => true, abortLosers: true },
+);
+
+if (winner.key === "api") {
+  winner.value; // User
+}
+```
+
+If every task rejects, `raceUntil()` rejects with `NoAcceptedResultError`, which
+extends `AggregateError`. Unlike native `Promise.any()`, its `rejections`
+property retains each task key alongside the original rejection reason.
+
 ```ts
 import { raceUntil } from "better-race";
 
